@@ -1,0 +1,1121 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sopamini · Diario</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,700;1,400&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1108;
+    --paper: #f5f0e8;
+    --accent: #c8410a;
+    --accent2: #2a5f8f;
+    --grid-line: #1a1108;
+    --cell-size: 54px;
+    --found-bg: #c8f0cc;
+    --selecting-bg: #f0c060;
+    --wrong-bg: #ffd0cc;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 16px 48px;
+    background-image: repeating-linear-gradient(0deg, transparent, transparent 31px, rgba(26,17,8,0.06) 31px, rgba(26,17,8,0.06) 32px);
+  }
+
+  /* ── HEADER ── */
+  header {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 2.5px solid var(--ink);
+    padding-bottom: 10px;
+    margin-bottom: 4px;
+  }
+  .masthead { font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700; letter-spacing: -1px; }
+  .masthead span { color: var(--accent); font-style: italic; font-weight: 400; }
+  .date-line { font-family: 'DM Mono', monospace; font-size: 0.7rem; letter-spacing: 0.05em; opacity: 0.6; }
+  .tagline { width: 100%; max-width: 560px; font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; opacity: 0.5; margin-bottom: 20px; font-weight: 500; }
+
+  .tema-bar {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin-bottom: 20px;
+    padding: 8px 12px;
+    border: 1.5px solid var(--ink);
+    background: rgba(26,17,8,0.04);
+  }
+  .tema-label {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.6rem;
+    letter-spacing: 0.15em;
+    opacity: 0.45;
+    flex-shrink: 0;
+  }
+  .tema-word {
+    font-family: 'Playfair Display', serif;
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+    flex-shrink: 0;
+  }
+  .tema-pista {
+    font-size: 0.75rem;
+    opacity: 0.55;
+    font-weight: 300;
+    font-style: italic;
+  }
+
+
+  /* ── ATTEMPTS BAR ── */
+  .attempts-bar {
+    width: 100%;
+    max-width: 560px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+  .attempts-label { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--accent); font-weight: 500; }
+  .timer-display  { font-family: 'DM Mono', monospace; font-size: 0.75rem; color: var(--accent2); font-weight: 500; }
+  .attempt-dots { display: flex; gap: 6px; }
+  .dot {
+    width: 12px; height: 12px; border-radius: 50%;
+    border: 2px solid var(--ink);
+    background: transparent;
+    transition: background 0.3s;
+  }
+  .dot.used    { background: var(--accent);  border-color: var(--accent); }
+  .dot.success { background: #2d7a3a; border-color: #2d7a3a; }
+
+  /* ── STATUS ── */
+  #status-bar {
+    font-family: 'DM Mono', monospace; font-size: 0.75rem;
+    letter-spacing: 0.05em; min-height: 18px; text-align: center;
+    width: 100%; max-width: 560px;
+  }
+
+  /* ── GRID ── */
+  #grid-wrap { position: relative; }
+
+  #grid {
+    display: grid;
+    grid-template-columns: repeat(5, var(--cell-size));
+    grid-template-rows:    repeat(5, var(--cell-size));
+    border: 2.5px solid var(--grid-line);
+    background: var(--grid-line);
+    gap: 1.5px;
+  }
+
+  .cell {
+    width: var(--cell-size);
+    height: var(--cell-size);
+    background: var(--paper);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'DM Mono', monospace;
+    font-size: 1.25rem;
+    font-weight: 500;
+    color: var(--ink);
+    cursor: pointer;
+    transition: background 0.12s, color 0.12s;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .cell:hover { background: #ede7d9; }
+  .cell.selecting  { background: var(--selecting-bg); }
+  .cell.found-cell { background: var(--found-bg); color: #1a5c25; cursor: default; }
+  .cell.wrong-flash {
+    background: var(--wrong-bg);
+    animation: wrongShake 0.4s ease;
+  }
+
+  @keyframes wrongShake {
+    0%,100% { transform: translateX(0); }
+    25%     { transform: translateX(-4px); }
+    75%     { transform: translateX(4px); }
+  }
+
+  /* ── WORD DISPLAY ── */
+  #word-display {
+    width: 100%;
+    max-width: 560px;
+    min-height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    border-bottom: 1.5px solid var(--ink);
+    border-top: 1.5px solid var(--ink);
+    padding: 6px 0;
+  }
+
+  .word-letter {
+    font-family: 'DM Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 500;
+    color: var(--ink);
+    animation: popIn 0.08s ease;
+  }
+  @keyframes popIn { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+  .word-placeholder {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    opacity: 0.4;
+    text-transform: uppercase;
+  }
+
+  /* ── BUTTONS ── */
+  button {
+    font-family: 'DM Sans', sans-serif; font-size: 0.78rem; font-weight: 500;
+    letter-spacing: 0.06em; text-transform: uppercase; padding: 10px 20px;
+    border: 2px solid var(--ink); background: transparent; color: var(--ink);
+    cursor: pointer; transition: all 0.15s;
+  }
+  button:hover { background: var(--ink); color: var(--paper); }
+  button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+  button.primary:hover { background: #a33208; border-color: #a33208; }
+  button:disabled { opacity: 0.35; cursor: not-allowed; }
+  button:disabled:hover { background: transparent; color: var(--ink); }
+  button.primary:disabled:hover { background: var(--accent); color: white; }
+
+  #btn-play { width: 100%; max-width: 560px; }
+
+  /* ── WORDS PANEL ── */
+  .words-panel { width: 100%; max-width: 560px; }
+
+  .words-panel h3 {
+    font-family: 'Playfair Display', serif; font-size: 0.85rem; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    border-bottom: 1.5px solid var(--ink); padding-bottom: 5px; margin-bottom: 10px;
+  }
+
+  .word-slots { display: flex; flex-direction: column; gap: 0; }
+
+  /* Match crucimini .clue-item exactly */
+  .word-slot {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 7px;
+    border-radius: 2px;
+    padding: 2px 4px;
+    transition: background 0.12s;
+    align-items: flex-start;
+  }
+
+  .word-slot.found .slot-word { color: var(--accent); }
+  .word-slot.found { background: #c8f0cc; border-radius: 2px; }
+
+  .word-slot.hidden-slot { opacity: 0.45; }
+
+  /* Slot number bubble — like .clue-num */
+  .slot-num {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--accent);
+    min-width: 18px;
+    padding-top: 1px;
+    flex-shrink: 0;
+  }
+
+  /* Word shown after found — replaces the number */
+  .slot-word {
+    font-family: 'DM Mono', monospace;
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--accent);
+    min-width: 52px;
+    padding-top: 1px;
+    flex-shrink: 0;
+    letter-spacing: 0.04em;
+  }
+
+  /* Clue text — like .clue-text */
+  .slot-clue {
+    font-size: 0.78rem;
+    line-height: 1.4;
+    font-weight: 300;
+  }
+
+  .slot-dots {
+    display: flex;
+    gap: 3px;
+    align-items: center;
+    padding-top: 3px;
+    flex-shrink: 0;
+  }
+  .slot-dot {
+    width: 5px; height: 5px; border-radius: 50%;
+    background: rgba(26,17,8,0.2);
+  }
+
+  /* ── OVERLAYS ── */
+  #result-overlay, #locked-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(26,17,8,0.88); z-index: 100;
+    align-items: center; justify-content: center;
+  }
+  #result-overlay.show, #locked-overlay.show { display: flex; animation: fadeIn 0.4s ease; }
+  @keyframes fadeIn { from { opacity:0 } to { opacity:1 } }
+
+  .result-card, .locked-card {
+    background: var(--paper); padding: 36px 44px; text-align: center;
+    border: 3px solid var(--ink); max-width: 360px; width: 90%;
+  }
+  .result-card .emoji-big { font-size: 3rem; margin-bottom: 8px; }
+  .result-card .big, .locked-card .big {
+    font-family: 'Playfair Display', serif; font-size: 2rem; font-weight: 700;
+    line-height: 1; margin-bottom: 6px;
+  }
+  .result-card .sub, .locked-card .sub { font-size: 0.85rem; opacity: 0.6; margin-bottom: 8px; }
+  .result-card .attempts-used {
+    font-family: 'DM Mono', monospace; font-size: 1rem;
+    color: var(--accent); margin-bottom: 20px;
+  }
+  .share-text, .locked-share {
+    font-family: 'DM Mono', monospace; font-size: 0.72rem;
+    background: rgba(26,17,8,0.06); padding: 12px; margin-bottom: 16px;
+    white-space: pre; line-height: 1.6; border: 1px solid rgba(26,17,8,0.15);
+    text-align: left;
+  }
+  .share-btn { width: 100%; margin-bottom: 8px; }
+  .next-puzzle-info { font-family: 'DM Mono', monospace; font-size: 0.68rem; opacity: 0.5; margin-top: 12px; }
+  .countdown { font-family: 'DM Mono', monospace; font-size: 1.6rem; color: var(--accent); margin-bottom: 20px; }
+
+  /* ── LAYOUT WRAPPER ── */
+  .game-area {
+    width: 100%; max-width: 560px;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 18px;
+  }
+
+  @media (max-width: 480px) {
+    :root { --cell-size: 62px; }
+    .masthead { font-size: 1.5rem; }
+    .result-card, .locked-card { padding: 28px 24px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="masthead">Sopa<span>mini</span></div>
+  <div class="date-line" id="date-display"></div>
+</header>
+<div class="tagline">encuentra las 5 palabras ocultas</div>
+<div class="tema-bar">
+  <span class="tema-label">TEMA</span>
+  <span class="tema-word" id="tema-word">·····</span>
+  <span class="tema-pista" id="tema-pista"></span>
+</div>
+
+<div class="attempts-bar">
+  <span class="attempts-label" id="attempts-label">INTENTO 1 / 3</span>
+  <span class="timer-display" id="timer-display">0:00</span>
+  <div class="attempt-dots">
+    <div class="dot" id="dot-0"></div>
+    <div class="dot" id="dot-1"></div>
+    <div class="dot" id="dot-2"></div>
+  </div>
+</div>
+
+<div class="game-area">
+  <div id="status-bar"></div>
+
+  <div id="grid-wrap">
+    <div id="grid"></div>
+  </div>
+
+  <div id="word-display">
+    <span class="word-placeholder">Selecciona letras en línea recta</span>
+  </div>
+
+  <button id="btn-play" class="primary" disabled onclick="playWord()">Jugar palabra →</button>
+
+  <div class="words-panel">
+    <h3>Palabras — <span id="found-count">0</span> / 5 encontradas</h3>
+    <div class="word-slots" id="word-slots"></div>
+  </div>
+</div>
+
+<!-- Result overlay -->
+<div id="result-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="result-card">
+    <div class="emoji-big" id="r-emoji"></div>
+    <div class="big" id="r-title"></div>
+    <div class="sub" id="r-sub"></div>
+    <div class="attempts-used" id="r-stat"></div>
+    <div class="share-text" id="r-share"></div>
+    <button class="primary share-btn" onclick="copyShare()">Copiar resultado 📋</button>
+    <button onclick="document.getElementById('result-overlay').classList.remove('show')">Ver sopa ↓</button>
+    <div class="next-puzzle-info" id="next-puzzle-info"></div>
+  </div>
+</div>
+
+<!-- Locked overlay -->
+<div id="locked-overlay" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="locked-card">
+    <div class="big">Ya jugaste hoy</div>
+    <div class="sub">El próximo puzzle en:</div>
+    <div class="countdown" id="countdown">--:--:--</div>
+    <div class="locked-share" id="locked-share"></div>
+    <button class="primary share-btn" onclick="copyShare()">Copiar resultado 📋</button>
+    <button onclick="document.getElementById('locked-overlay').classList.remove('show')">Ver sopa ↓</button>
+  </div>
+</div>
+
+<script>
+
+// ══════════════════════════════════════════════════════════
+// WORD DATABASE  (3-5 letras, sin tildes)
+// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// GRUPOS TEMÁTICOS
+// Formato: { tema, pista, words: [{word, clue}] }
+// → Añade nuevos grupos al final del array
+// ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════
+// GRUPOS TEMÁTICOS
+// Formato: { tema, pista, words: [{word, clue}, ...] }
+// - tema:  palabra temática mostrada al jugador (≤8 chars, sin tildes idealmente)
+// - pista: descripción larga del tema
+// - words: exactamente 5 palabras de 3-5 letras (sin tildes ni Ñ)
+// Para añadir grupos nuevos: copia un bloque { tema, pista, words } y pégalo al final
+// El puzzle del día se selecciona secuencialmente: día 1 → grupo 0, día 2 → grupo 1, etc.
+// ══════════════════════════════════════════════════════════
+const GRUPOS = [
+  {
+    tema: "Mares del mundo",
+    words: [
+      { word: "ROJO",    clue: "Mar entre Arabia y África" },
+      { word: "NEGRO",   clue: "Mar entre Europa del Este y Turquía" },
+      { word: "NORTE",   clue: "Mar entre el Reino Unido y Escandinavia" },
+      { word: "CARIBE",  clue: "Mar tropical de las Antillas" },
+      { word: "CORAL",   clue: "Mar australiano rico en arrecifes" },
+    ]
+  },
+  {
+    tema: "Partes de un volcán",
+    words: [
+      { word: "LAVA",    clue: "Roca fundida que fluye al exterior" },
+      { word: "MAGMA",   clue: "Roca fundida en el interior terrestre" },
+      { word: "CRATER",  clue: "Abertura en la cima del volcán" },
+      { word: "CENIZA",  clue: "Residuo fino de la erupción" },
+      { word: "VAPOR",   clue: "Gas que expulsa el volcán" },
+    ]
+  },
+  {
+    tema: "Flamenco",
+    words: [
+      { word: "PALO",    clue: "Cada estilo o forma del flamenco" },
+      { word: "DUENDE",  clue: "Alma y misterio del cante flamenco" },
+      { word: "JALEO",   clue: "Exclamación de ánimo al bailaor" },
+      { word: "COMPAS",  clue: "Ritmo base del flamenco" },
+      { word: "BATA",    clue: "___ de cola, vestido de flamenca" },
+    ]
+  },
+  {
+    tema: "Tipos de setas",
+    words: [
+      { word: "BOLETO",  clue: "Seta de sombrero marrón muy apreciada" },
+      { word: "TRUFA",   clue: "Hongo subterráneo de alto valor gastronómico" },
+      { word: "NISCAL",  clue: "Seta naranja del pinar" },
+      { word: "ORONJA",  clue: "Seta imperial de color naranja intenso" },
+      { word: "SETA",    clue: "Nombre genérico del hongo con sombrero" },
+    ]
+  },
+  {
+    tema: "El Quijote",
+    words: [
+      { word: "LANZA",   clue: "Arma favorita del caballero manchego" },
+      { word: "MOLINO",  clue: "Gigante imaginado por Don Quijote" },
+      { word: "DULCE",   clue: "___ del Toboso, dama imaginada por el hidalgo" },
+      { word: "ROCIN",   clue: "Caballo flaco y viejo del Quijote" },
+      { word: "MANCHA",  clue: "Región de donde era el ingenioso hidalgo" },
+    ]
+  },
+  {
+    tema: "Utensilios de cocina",
+    words: [
+      { word: "SARTEN",  clue: "Utensilio plano para freír" },
+      { word: "COLADOR", clue: "Utensilio con agujeros para escurrir" },
+      { word: "BATIDOR", clue: "Utensilio para mezclar y emulsionar" },
+      { word: "MOLDE",   clue: "Recipiente que da forma al alimento" },
+      { word: "CAZO",    clue: "Recipiente hondo con mango para calentar" },
+    ]
+  },
+  {
+    tema: "Vientos famosos",
+    words: [
+      { word: "CIERZO",  clue: "Viento frío del norte en Aragón" },
+      { word: "TRAMÓN",  clue: "Viento del norte en el Mediterráneo" },
+      { word: "LEVANT",  clue: "Viento del este en el Mediterráneo" },
+      { word: "BOREAL",  clue: "Relativo al viento del norte" },
+      { word: "AUSTRO",  clue: "Viento del sur, nombre poético" },
+    ]
+  },
+  {
+    tema: "Quesos españoles",
+    words: [
+      { word: "TORTA",   clue: "___ del Casar, queso extremeño cremoso" },
+      { word: "TETILLA", clue: "Queso gallego con forma cónica" },
+      { word: "BURGOS",  clue: "Queso fresco de leche de oveja castellano" },
+      { word: "RONCAL",  clue: "Queso navarro de oveja curado" },
+      { word: "MAHON",   clue: "Queso menorquín con forma de almohada" },
+    ]
+  },
+  {
+    tema: "Ríos de España",
+    words: [
+      { word: "EBRO",    clue: "El río más caudaloso de España" },
+      { word: "TAJO",    clue: "Río que nace en Teruel y muere en Lisboa" },
+      { word: "DUERO",   clue: "Río que atraviesa Castilla y Portugal" },
+      { word: "SEGURA",  clue: "Río del sureste, nace en Jaén" },
+      { word: "MINO",    clue: "Río gallego que hace de frontera con Portugal" },
+    ]
+  },
+  {
+    tema: "Dioses griegos",
+    words: [
+      { word: "ZEUS",    clue: "Dios supremo del Olimpo griego" },
+      { word: "ARES",    clue: "Dios griego de la guerra" },
+      { word: "HERA",    clue: "Diosa del matrimonio, esposa de Zeus" },
+      { word: "APOLO",   clue: "Dios del sol, la música y las artes" },
+      { word: "HERMES",  clue: "Mensajero de los dioses" },
+    ]
+  },
+  {
+    tema: "Tipos de café",
+    words: [
+      { word: "SOLO",    clue: "Café sin leche, espresso puro" },
+      { word: "CORTO",   clue: "Espresso con muy poca agua" },
+      { word: "LARGO",   clue: "Espresso con más agua de lo normal" },
+      { word: "BOMBON",  clue: "Café con leche condensada" },
+      { word: "HIELO",   clue: "Café servido frío sobre cubitos" },
+    ]
+  },
+  {
+    tema: "Géneros musicales",
+    words: [
+      { word: "JAZZ",    clue: "Género de origen afroamericano con improvisación" },
+      { word: "SOUL",    clue: "Música de raíz gospel y ritmo & blues" },
+      { word: "BLUES",   clue: "Género de doce compases y lamento vocal" },
+      { word: "SALSA",   clue: "Género tropical caribeño de baile" },
+      { word: "TANGO",   clue: "Danza de pareja originaria de Buenos Aires" },
+    ]
+  },
+  {
+    tema: "Palos de la baraja española",
+    words: [
+      { word: "OROS",    clue: "Palo de monedas doradas" },
+      { word: "COPAS",   clue: "Palo de cálices en la baraja española" },
+      { word: "ESPADA",  clue: "Palo de arma blanca en la baraja española" },
+      { word: "BASTO",   clue: "Palo de garrote en la baraja española" },
+      { word: "COMODIN", clue: "Carta que sustituye a cualquier otra" },
+    ]
+  },
+  {
+    tema: "Planetas del sistema solar",
+    words: [
+      { word: "MARTE",   clue: "Planeta rojo vecino de la Tierra" },
+      { word: "VENUS",   clue: "Planeta más brillante del cielo nocturno" },
+      { word: "URANO",   clue: "Séptimo planeta, rotación inclinada" },
+      { word: "TIERRA",  clue: "Nuestro planeta, el tercero" },
+      { word: "NEPTUNO", clue: "El planeta más lejano del sistema solar" },
+    ]
+  },
+  {
+    tema: "Tapas españolas",
+    words: [
+      { word: "PINCHO",  clue: "Tapa sobre pan, sujetada con palillo" },
+      { word: "CROQUETA",clue: "Fritura de bechamel con jamón o bacalao" },
+      { word: "PULPO",   clue: "A feira, con pimentón y aceite gallego" },
+      { word: "GAMBA",   clue: "Crustáceo marino a la plancha o al ajillo" },
+      { word: "TORTILLA",clue: "De patata, la tapa más emblemática de España" },
+    ]
+  },
+  {
+    tema: "Montañismo",
+    words: [
+      { word: "CIMA",    clue: "Punto más alto de una montaña" },
+      { word: "RAPEL",   clue: "Técnica de descenso por una cuerda" },
+      { word: "ARNES",   clue: "Equipo de seguridad que rodea el cuerpo" },
+      { word: "FISURA",  clue: "Grieta en la roca por donde escalar" },
+      { word: "PIOLET",  clue: "Herramienta de hielo con pico y paleta" },
+    ]
+  },
+  {
+    tema: "Componentes de la sangre",
+    words: [
+      { word: "PLASMA",  clue: "Parte líquida y amarillenta de la sangre" },
+      { word: "GLOBULO", clue: "Célula sanguínea, roja o blanca" },
+      { word: "SUERO",   clue: "Plasma sin factores de coagulación" },
+      { word: "FIBRINA", clue: "Proteína que forma el coágulo sanguíneo" },
+      { word: "PLAQUETA",clue: "Fragmento celular que coagula la sangre" },
+    ]
+  },
+  {
+    tema: "Bailes del mundo",
+    words: [
+      { word: "SALSA",   clue: "Baile caribeño de pareja en círculo" },
+      { word: "TANGO",   clue: "Baile apasionado de Buenos Aires" },
+      { word: "SAMBA",   clue: "Baile popular brasileño de carnaval" },
+      { word: "RUMBA",   clue: "Baile afrocubano de ritmo sincopado" },
+      { word: "POLKA",   clue: "Baile de origen centroeuropeo a dos tiempos" },
+    ]
+  },
+];
+
+// ══════════════════════════════════════════════════════════
+// Selección secuencial por fecha: día 0 = grupo 0, día 1 = grupo 1…
+// Usa la diferencia de días desde una fecha base fija
+// ══════════════════════════════════════════════════════════
+const BASE_DATE = new Date('2025-01-01');
+
+function getDailyGroup(dateStr) {
+  const today = new Date(dateStr);
+  const diff  = Math.floor((today - BASE_DATE) / (1000 * 60 * 60 * 24));
+  const index = ((diff % GRUPOS.length) + GRUPOS.length) % GRUPOS.length;
+  return GRUPOS[index];
+}
+
+
+function generatePuzzle(dateStr) {
+  const group = getDailyGroup(dateStr);
+  const seed  = dateToSeed(dateStr);
+  const rng   = mulberry32(seed);
+
+  // Sanitize words: uppercase, strip accents, max 5 chars
+  const sanitize = w => w.toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^A-Z]/g, '')
+    .slice(0, GRID_SIZE);
+
+  const words = group.words.map(e => ({ ...e, word: sanitize(e.word) }));
+
+  // Try multiple seeded layouts
+  for (let attempt = 0; attempt < 300; attempt++) {
+    const shuffled = seededShuffle(words, mulberry32(seed + attempt * 13));
+    const result   = tryPlace(shuffled, mulberry32(seed + attempt * 7));
+    if (result) return { ...result, tema: group.tema };
+  }
+  return null;
+}
+
+function tryPlace(words, rng) {
+  let grid = Array.from({ length: GRID_SIZE }, () => Array(GRID_SIZE).fill(''));
+  const placed = [];
+
+  for (const entry of words) {
+    if (entry.word.length < 2) continue;
+    const positions = getAllPositions(grid, entry.word);
+    if (positions.length === 0) return null; // can't fit this word → fail fast
+    const idx = Math.floor(rng() * positions.length);
+    const { r, c, dr, dc } = positions[idx];
+    for (let i = 0; i < entry.word.length; i++) grid[r + dr*i][c + dc*i] = entry.word[i];
+    placed.push({ ...entry, r, c, dr, dc });
+  }
+
+  if (placed.length < TARGET_WORDS) return null;
+
+  // Fill blanks with noise letters (excluding common confusables)
+  const noise = 'ABCDEFGHIJLMNOPRSTUVZ';
+  for (let r = 0; r < GRID_SIZE; r++)
+    for (let c = 0; c < GRID_SIZE; c++)
+      if (!grid[r][c]) grid[r][c] = noise[Math.floor(rng() * noise.length)];
+
+  return { grid, words: placed };
+}
+
+function getAllPositions(grid, word) {
+  const out = [];
+  for (const [dr, dc] of DIRS)
+    for (let r = 0; r < GRID_SIZE; r++)
+      for (let c = 0; c < GRID_SIZE; c++)
+        if (canFit(grid, word, r, c, dr, dc)) out.push({ r, c, dr, dc });
+  return out;
+}
+
+function canFit(grid, word, r, c, dr, dc) {
+  for (let i = 0; i < word.length; i++) {
+    const nr = r + dr*i, nc = c + dc*i;
+    if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
+    if (grid[nr][nc] !== '' && grid[nr][nc] !== word[i]) return false;
+  }
+  return true;
+}
+
+// ══════════════════════════════════════════════════════════
+// STATE
+// ══════════════════════════════════════════════════════════
+let puzzle      = null;
+let todayKey    = '';
+let selecting   = false;
+let selStart    = null;   // {r,c}
+let selCurrent  = null;   // {r,c}
+let selCells    = [];     // [{r,c}]
+let foundWords  = new Set();
+let attemptsLeft = 3;
+let attemptsUsed = 0;
+let gameOver    = false;
+let timerSecs   = 0;
+let timerInt    = null;
+let timerStarted = false;
+let _shareStr   = '';
+
+// ══════════════════════════════════════════════════════════
+// RENDER GRID
+// ══════════════════════════════════════════════════════════
+function renderGrid() {
+  const el = document.getElementById('grid');
+  el.innerHTML = '';
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'cell';
+      cell.textContent = puzzle.grid[r][c];
+      cell.dataset.r = r; cell.dataset.c = c;
+      cell.addEventListener('pointerdown', e => { e.preventDefault(); onPointerDown(r,c); });
+      cell.addEventListener('pointerenter', e => { e.preventDefault(); onPointerEnter(r,c); });
+      el.appendChild(cell);
+    }
+  }
+  document.addEventListener('pointerup', onPointerUp);
+}
+
+function cellEl(r, c) {
+  return document.querySelector(`.cell[data-r="${r}"][data-c="${c}"]`);
+}
+
+// ══════════════════════════════════════════════════════════
+// SELECTION — straight line only
+// ══════════════════════════════════════════════════════════
+function onPointerDown(r, c) {
+  if (gameOver) return;
+  startTimer();
+  selecting  = true;
+  selStart   = {r, c};
+  selCurrent = {r, c};
+  updateSelection();
+}
+
+function onPointerEnter(r, c) {
+  if (!selecting) return;
+  selCurrent = {r, c};
+  updateSelection();
+}
+
+function onPointerUp() {
+  if (!selecting) return;
+  selecting = false;
+  // keep selection visible, enable play button
+  document.getElementById('btn-play').disabled = selCells.length < 2;
+}
+
+function getStraightLine(r0, c0, r1, c1) {
+  // Returns cells only if they form a straight line (H/V/diagonal)
+  const dr = r1 - r0, dc = c1 - c0;
+  const len = Math.max(Math.abs(dr), Math.abs(dc));
+  if (len === 0) return [{r: r0, c: c0}];
+
+  const stepR = dr === 0 ? 0 : dr / Math.abs(dr);
+  const stepC = dc === 0 ? 0 : dc / Math.abs(dc);
+
+  // Must be perfectly H, V, or 45° diagonal
+  if (Math.abs(dr) !== 0 && Math.abs(dc) !== 0 && Math.abs(dr) !== Math.abs(dc)) {
+    return [{r: r0, c: c0}]; // not a valid diagonal
+  }
+
+  const cells = [];
+  for (let i = 0; i <= len; i++) cells.push({r: r0 + stepR*i, c: c0 + stepC*i});
+  return cells;
+}
+
+function updateSelection() {
+  // Clear old highlights
+  document.querySelectorAll('.cell.selecting').forEach(el => el.classList.remove('selecting'));
+
+  selCells = selStart && selCurrent
+    ? getStraightLine(selStart.r, selStart.c, selCurrent.r, selCurrent.c)
+    : [];
+
+  selCells.forEach(({r,c}) => {
+    const el = cellEl(r,c);
+    if (el && !el.classList.contains('found-cell')) el.classList.add('selecting');
+  });
+
+  // Update word display
+  const wd = document.getElementById('word-display');
+  if (selCells.length < 2) {
+    wd.innerHTML = '<span class="word-placeholder">Selecciona letras en línea recta</span>';
+    document.getElementById('btn-play').disabled = true;
+  } else {
+    const word = selCells.map(({r,c}) => puzzle.grid[r][c]).join('');
+    wd.innerHTML = word.split('').map(l => `<span class="word-letter">${l}</span>`).join('');
+    document.getElementById('btn-play').disabled = false;
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// PLAY WORD
+// ══════════════════════════════════════════════════════════
+function playWord() {
+  if (gameOver || selCells.length < 2) return;
+
+  const word = selCells.map(({r,c}) => puzzle.grid[r][c]).join('');
+
+  // Check if it matches one of the 5 hidden words
+  const match = puzzle.words.find(w =>
+    !foundWords.has(w.word) &&
+    w.word === word
+  );
+
+  if (match) {
+    foundWords.add(match.word);
+    // Mark cells as found
+    for (let i = 0; i < match.word.length; i++) {
+      const r = match.r + match.dr * i;
+      const c = match.c + match.dc * i;
+      const el = cellEl(r, c);
+      if (el) { el.classList.remove('selecting'); el.classList.add('found-cell'); }
+    }
+    revealWordSlot(match);
+    clearSelection();
+    updateFoundCount();
+    saveState();
+
+    if (foundWords.size === TARGET_WORDS) {
+      setTimeout(() => endGame(true), 500);
+    }
+  } else {
+    // Wrong
+    attemptsUsed++;
+    attemptsLeft--;
+    updateDots();
+
+    // Flash red
+    selCells.forEach(({r,c}) => {
+      const el = cellEl(r,c);
+      if (el && !el.classList.contains('found-cell')) {
+        el.classList.remove('selecting');
+        el.classList.add('wrong-flash');
+        setTimeout(() => el.classList.remove('wrong-flash'), 450);
+      }
+    });
+
+    const sb = document.getElementById('status-bar');
+    sb.style.color = 'var(--accent2)';
+    if (attemptsLeft === 0) {
+      clearSelection();
+      saveState();
+      setTimeout(() => endGame(false), 500);
+    } else {
+      sb.textContent = `"${word}" no está entre las 5 palabras — ${attemptsLeft} intento${attemptsLeft!==1?'s':''} restante${attemptsLeft!==1?'s':''}`;
+      setTimeout(() => { sb.textContent = ''; sb.style.color = ''; }, 2500);
+      clearSelection();
+      saveState();
+    }
+  }
+}
+
+function clearSelection() {
+  document.querySelectorAll('.cell.selecting').forEach(el => el.classList.remove('selecting'));
+  selCells = [];
+  selStart = null;
+  selCurrent = null;
+  document.getElementById('word-display').innerHTML = '<span class="word-placeholder">Selecciona letras en línea recta</span>';
+  document.getElementById('btn-play').disabled = true;
+}
+
+// ══════════════════════════════════════════════════════════
+// WORD SLOTS
+// ══════════════════════════════════════════════════════════
+function renderWordSlots() {
+  const el = document.getElementById('word-slots');
+  el.innerHTML = '';
+  for (let i = 0; i < TARGET_WORDS; i++) {
+    const slot = document.createElement('div');
+    slot.className = 'word-slot hidden-slot';
+    slot.id = `slot-${i}`;
+    slot.innerHTML = `
+      <span class="slot-num">${i + 1}</span>
+      <span class="slot-clue" style="opacity:0.3">· · ·</span>
+    `;
+    el.appendChild(slot);
+  }
+}
+
+function revealWordSlot(wordEntry) {
+  // Find next unrevealed slot
+  const slots = document.querySelectorAll('.word-slot.hidden-slot');
+  if (!slots.length) return;
+  const slot = slots[0];
+  slot.classList.remove('hidden-slot');
+  slot.classList.add('found');
+  slot.innerHTML = `
+    <span class="slot-word">${wordEntry.word}</span>
+    <span class="slot-clue">${wordEntry.clue}</span>
+  `;
+}
+
+function updateFoundCount() {
+  document.getElementById('found-count').textContent = foundWords.size;
+}
+
+function updateDots() {
+  for (let i = 0; i < 3; i++) {
+    const dot = document.getElementById(`dot-${i}`);
+    dot.className = 'dot';
+    if (i < attemptsUsed) dot.classList.add('used');
+  }
+  const lbl = document.getElementById('attempts-label');
+  if (lbl) lbl.textContent = gameOver ? 'FIN' : `INTENTO ${attemptsUsed + 1} / 3`;
+}
+
+// ══════════════════════════════════════════════════════════
+// TIMER
+// ══════════════════════════════════════════════════════════
+function startTimer() {
+  if (timerStarted) return;
+  timerStarted = true;
+  timerInt = setInterval(() => {
+    timerSecs++;
+    const el = document.getElementById('timer-display');
+    if (el) el.textContent = formatTime(timerSecs);
+  }, 1000);
+}
+function stopTimer() { clearInterval(timerInt); }
+function formatTime(s) {
+  const m = Math.floor(s/60), ss = s%60;
+  return `${m}:${String(ss).padStart(2,'0')}`;
+}
+
+// ══════════════════════════════════════════════════════════
+// END GAME
+// ══════════════════════════════════════════════════════════
+function endGame(won) {
+  gameOver = true;
+  stopTimer();
+  document.getElementById('btn-play').disabled = true;
+
+  if (!won) {
+    // Reveal all remaining words
+    puzzle.words.forEach(w => {
+      if (!foundWords.has(w.word)) {
+        revealWordSlot(w);
+        for (let i = 0; i < w.word.length; i++) {
+          const el = cellEl(w.r + w.dr*i, w.c + w.dc*i);
+          if (el) { el.classList.remove('selecting'); el.classList.add('found-cell'); el.style.opacity='0.5'; }
+        }
+      }
+    });
+  }
+
+  saveState();
+  _shareStr = buildShareStr(won);
+  setTimeout(() => showResult(won), 600);
+}
+
+// ══════════════════════════════════════════════════════════
+// SHARE
+// ══════════════════════════════════════════════════════════
+function buildShareStr(won) {
+  const header = `Sopamini ${todayKey} · ${puzzle ? puzzle.tema : ''}`;
+  const res = won
+    ? `✅ ${foundWords.size}/5 palabras · ${attemptsUsed} fallo${attemptsUsed!==1?'s':''} · ${formatTime(timerSecs)}`
+    : `❌ ${foundWords.size}/5 palabras · sin intentos`;
+
+  // 5×5 emoji grid
+  const foundCells = new Set();
+  puzzle.words.forEach(w => {
+    if (foundWords.has(w.word)) {
+      for (let i=0; i<w.word.length; i++) foundCells.add(`${w.r+w.dr*i},${w.c+w.dc*i}`);
+    }
+  });
+  let grid = '';
+  for (let r=0; r<GRID_SIZE; r++) {
+    for (let c=0; c<GRID_SIZE; c++) grid += foundCells.has(`${r},${c}`) ? '🟨' : '⬛';
+    grid += '\n';
+  }
+  return `${header}\n${res}\n\n${grid.trim()}`;
+}
+
+function showResult(won) {
+  document.getElementById('r-emoji').textContent   = won ? '🎉' : '😔';
+  document.getElementById('r-title').textContent   = won ? '¡Encontradas!' : 'Mañana será';
+  document.getElementById('r-sub').textContent     = won ? `Todas las palabras al descubierto` : `Se han revelado las palabras que faltaban`;
+  document.getElementById('r-stat').textContent    = won
+    ? `${attemptsUsed} fallo${attemptsUsed!==1?'s':''} · ${formatTime(timerSecs)}`
+    : `${foundWords.size} de 5 encontradas`;
+  document.getElementById('r-share').textContent   = _shareStr;
+  const msLeft = msToMidnight();
+  const npi = document.getElementById('next-puzzle-info');
+  if (npi) npi.textContent = `Próximo puzzle en ${fmtCountdown(msLeft)}`;
+  document.getElementById('result-overlay').classList.add('show');
+}
+
+function copyShare() {
+  const text = _shareStr || document.getElementById('locked-share').textContent;
+  const flash = () => {
+    document.querySelectorAll('.modal button').forEach(b => {
+      if (b.textContent.includes('Copiar')) { const o=b.textContent; b.textContent='¡Copiado! ✓'; setTimeout(()=>b.textContent=o,2000); }
+    });
+  };
+  if (navigator.clipboard && window.isSecureContext) {
+    navigator.clipboard.writeText(text).then(flash).catch(() => fallbackCopy(text, flash));
+  } else { fallbackCopy(text, flash); }
+}
+function fallbackCopy(text, cb) {
+  const ta = document.createElement('textarea');
+  ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+  document.body.appendChild(ta); ta.select();
+  try { document.execCommand('copy'); if(cb) cb(); } catch(e) { alert('Copia el texto manualmente.'); }
+  document.body.removeChild(ta);
+}
+
+// ══════════════════════════════════════════════════════════
+// COUNTDOWN
+// ══════════════════════════════════════════════════════════
+function msToMidnight() {
+  const n=new Date(), m=new Date(n); m.setHours(24,0,0,0); return m-n;
+}
+function fmtCountdown(ms) {
+  const t=Math.floor(ms/1000), h=Math.floor(t/3600), m=Math.floor((t%3600)/60), s=t%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
+function startCountdown() {
+  const el = document.getElementById('countdown');
+  const tick = () => el.textContent = fmtCountdown(msToMidnight());
+  tick(); setInterval(tick, 1000);
+}
+
+// ══════════════════════════════════════════════════════════
+// LOCALSTORAGE
+// ══════════════════════════════════════════════════════════
+function saveState() {
+  localStorage.setItem('sopamini_state', JSON.stringify({
+    date: todayKey,
+    foundWords: [...foundWords],
+    attemptsUsed,
+    attemptsLeft,
+    gameOver,
+    timerSecs
+  }));
+}
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('sopamini_state'));
+    if (!s || s.date !== todayKey) return null;
+    return s;
+  } catch(e) { return null; }
+}
+
+function restoreState(s) {
+  attemptsUsed = s.attemptsUsed;
+  attemptsLeft = s.attemptsLeft;
+  gameOver     = s.gameOver;
+  timerSecs    = s.timerSecs || 0;
+  foundWords   = new Set(s.foundWords || []);
+
+  updateDots();
+  updateFoundCount();
+
+  // Re-highlight found word cells and reveal slots
+  puzzle.words.forEach(w => {
+    if (foundWords.has(w.word)) {
+      for (let i=0; i<w.word.length; i++) {
+        const el = cellEl(w.r + w.dr*i, w.c + w.dc*i);
+        if (el) el.classList.add('found-cell');
+      }
+      revealWordSlot(w);
+    }
+  });
+
+  if (s.gameOver) {
+    document.getElementById('btn-play').disabled = true;
+    if (!s.foundWords || s.foundWords.length < TARGET_WORDS) {
+      // reveal remaining
+      puzzle.words.forEach(w => {
+        if (!foundWords.has(w.word)) {
+          revealWordSlot(w);
+          for (let i=0; i<w.word.length; i++) {
+            const el = cellEl(w.r+w.dr*i, w.c+w.dc*i);
+            if (el) { el.classList.add('found-cell'); el.style.opacity='0.5'; }
+          }
+        }
+      });
+    }
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
+document.addEventListener('DOMContentLoaded', () => {
+  const now = new Date();
+  todayKey = now.toISOString().slice(0,10);
+
+  document.getElementById('date-display').textContent =
+    now.toLocaleDateString('es-ES', {weekday:'short',day:'numeric',month:'long',year:'numeric'}).toUpperCase();
+
+  document.getElementById('status-bar').textContent = '⏳ Generando puzzle...';
+
+  setTimeout(() => {
+    puzzle = generatePuzzle(todayKey);
+
+    if (!puzzle) {
+      document.getElementById('status-bar').textContent = '⚠ Error generando puzzle.';
+      return;
+    }
+
+    renderGrid();
+    renderWordSlots();
+    document.getElementById('status-bar').textContent = '';
+    document.getElementById('tema-word').textContent = puzzle.tema;
+    document.getElementById('tema-pista').textContent = '— ' + puzzle.tema;
+
+    const saved = loadState();
+
+    if (saved && saved.gameOver) {
+      restoreState(saved);
+      _shareStr = buildShareStr(foundWords.size === TARGET_WORDS);
+      document.getElementById('locked-share').textContent = _shareStr;
+      setTimeout(() => {
+      document.getElementById('locked-overlay').classList.add('show');
+        startCountdown();
+      }, 400);
+      return;
+    }
+
+    if (saved) {
+      restoreState(saved);
+    } else {
+      updateDots();
+    }
+  }, 30);
+});
+
+</script>
+</body>
+</html>
