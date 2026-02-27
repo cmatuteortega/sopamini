@@ -120,6 +120,9 @@
     border: 2.5px solid var(--grid-line);
     background: var(--grid-line);
     gap: 1.5px;
+    touch-action: none;   /* prevent scroll hijacking our swipe */
+    user-select: none;
+    -webkit-user-select: none;
   }
 
   .cell {
@@ -310,9 +313,14 @@
   }
 
   @media (max-width: 480px) {
-    :root { --cell-size: 62px; }
+    :root { --cell-size: 44px; }
     .masthead { font-size: 1.5rem; }
     .result-card, .locked-card { padding: 28px 24px; }
+  }
+
+  /* Fill available width on small screens, same as crucimini */
+  @media (max-width: 380px) {
+    :root { --cell-size: calc((100vw - 64px) / 5); }
   }
 </style>
 </head>
@@ -724,12 +732,53 @@ function renderGrid() {
       cell.className = 'cell';
       cell.textContent = puzzle.grid[r][c];
       cell.dataset.r = r; cell.dataset.c = c;
-      cell.addEventListener('pointerdown', e => { e.preventDefault(); onPointerDown(r,c); });
-      cell.addEventListener('pointerenter', e => { e.preventDefault(); onPointerEnter(r,c); });
       el.appendChild(cell);
     }
   }
-  document.addEventListener('pointerup', onPointerUp);
+
+  // ── Unified pointer + touch handling ──────────────────────
+  // We attach to the grid container and hit-test manually so
+  // touch-swipe across cells works on mobile without scrolling.
+
+  function cellFromPoint(x, y) {
+    const target = document.elementFromPoint(x, y);
+    if (!target) return null;
+    const cell = target.closest('.cell');
+    if (!cell) return null;
+    return { r: parseInt(cell.dataset.r), c: parseInt(cell.dataset.c) };
+  }
+
+  // Mouse / stylus
+  el.addEventListener('mousedown', e => {
+    const pos = cellFromPoint(e.clientX, e.clientY);
+    if (pos) { e.preventDefault(); onPointerDown(pos.r, pos.c); }
+  });
+  el.addEventListener('mousemove', e => {
+    if (!selecting) return;
+    const pos = cellFromPoint(e.clientX, e.clientY);
+    if (pos) onPointerEnter(pos.r, pos.c);
+  });
+  document.addEventListener('mouseup', onPointerUp);
+
+  // Touch (mobile)
+  el.addEventListener('touchstart', e => {
+    const t = e.touches[0];
+    const pos = cellFromPoint(t.clientX, t.clientY);
+    if (pos) { e.preventDefault(); onPointerDown(pos.r, pos.c); }
+  }, { passive: false });
+
+  el.addEventListener('touchmove', e => {
+    if (!selecting) return;
+    e.preventDefault(); // stop page scroll while selecting
+    const t = e.touches[0];
+    const pos = cellFromPoint(t.clientX, t.clientY);
+    if (pos) onPointerEnter(pos.r, pos.c);
+  }, { passive: false });
+
+  el.addEventListener('touchend', e => {
+    e.preventDefault();
+    onPointerUp();
+  }, { passive: false });
 }
 
 function cellEl(r, c) {
@@ -1103,7 +1152,10 @@ function restoreState(s) {
 // ══════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
   const now = new Date();
-  todayKey = now.toISOString().slice(0,10);
+    const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, '0');
+  const d = String(now.getDate()).padStart(2, '0');
+  todayKey = `${y}-${m}-${d}`;
 
   document.getElementById('date-display').textContent =
     now.toLocaleDateString('es-ES', {weekday:'short',day:'numeric',month:'long',year:'numeric'}).toUpperCase();
